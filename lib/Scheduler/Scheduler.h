@@ -5,8 +5,8 @@
  */
 
 #pragma once
-#include <cstddef>
 #include "../Task/Task.h"
+#include <cstddef>
 
 /**
  * @class Scheduler
@@ -27,7 +27,7 @@ public:
      * A separate wrapper function is required since the addThread function does not accept lambdas.
      * @param arg void a pointer to the task.
      */
-    static void threadRunner(void *arg);
+    static void threadRunner(void* arg);
 
     /**
      * @brief adds a task to the scheduler execution pipeline.
@@ -38,8 +38,7 @@ public:
      * @param interval millisecond interval between consequent executions.
      * @param useThread should the function be offloaded to separate thread?
      */
-    void addTask(
-            const Task::TaskCallback &callback, unsigned long interval, bool useThread = false);
+    void addTask(const Task::TaskCallback& callback, unsigned long interval, bool useThread = false);
 
     /**
      * @brief updates all non-threaded tasks.
@@ -52,7 +51,8 @@ public:
      * @brief enable a task by index.
      * @param taskIndex index in the vector of tasks.
      */
-    inline void enableTask(const std::size_t taskIndex) {
+    inline void enableTask(const std::size_t taskIndex)
+    {
         if (taskIndex < tasks.size())
             tasks[taskIndex].isEnabled = true;
     }
@@ -61,7 +61,8 @@ public:
      * @brief disable a task by index.
      * @param taskIndex index in the vector of tasks.
      */
-    inline void disableTask(const std::size_t taskIndex) {
+    inline void disableTask(const std::size_t taskIndex)
+    {
         if (taskIndex < tasks.size())
             tasks[taskIndex].isEnabled = false;
     }
@@ -73,5 +74,6 @@ public:
     [[nodiscard]] std::size_t getTaskCount() const { return tasks.size(); }
 
 private:
+
     std::vector<Task> tasks; ///< vector of tasks
 };

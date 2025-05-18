@@ -19,12 +19,16 @@ struct Task {
     using TaskCallback = std::function<void()>;
 
     Task() = default;
-    Task(const TaskCallback &callback, const unsigned long interval, const bool enabled = true) :
-        callback(callback), interval(interval), lastRun(0), isEnabled(enabled), threadId(-1) { }
+    Task(const TaskCallback& callback, const unsigned long interval, const bool enabled = true)
+        : callback(callback)
+        , interval(interval)
+        , isEnabled(enabled)
+    {
+    }
 
     TaskCallback callback;
     unsigned long interval;
-    unsigned long lastRun;
+    unsigned long lastRun = 0;
     bool isEnabled : 1;
-    int threadId;
+    int threadId = -1;
 };

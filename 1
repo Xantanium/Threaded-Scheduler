@@ -1,8 +1,9 @@
 #include <../lib/Scheduler/Scheduler.h>
 #include <Arduino.h>
 #include <TeensyThreads.h>
+
+const int ledPin = 13;
 Scheduler scheduler;
-Threads::Mutex Serial_lock;
 
 // Placeholders for indexing demonstration
 int blinkTaskIndex = -1;
@@ -17,31 +18,21 @@ bool mathTaskEnabled = true;
 void blinkTask()
 {
     static bool ledState = false;
-    digitalWrite(LED_BUILTIN, ledState);
+    digitalWrite(ledPin, ledState);
     ledState = !ledState;
-
-    Threads::Scope scope(Serial_lock);
     Serial.println("[LED] Toggled.");
 }
 
 // Task: Math task every 100 ms
 void mathTask()
 {
-    float result = 0.0f; // No need for volatile if using proper synchronization
-
+    // volatile is not strictly required here, but incase this task is offloaded to a thread, it will be necessary.
+    // use volatile when a variable might be changed unexpectedly, like within an interrupt or thread.
+    static volatile float result = 0.0f;
     for (int i = 1; i < 500; ++i) {
         result += sqrtf(i);
-        if (i % 25 == 0) { // Yield more frequently
-            Threads::yield();
-        }
     }
-
-    // Minimize time spent holding the mutex
-    {
-        Threads::Scope scope(Serial_lock);
-        Serial.println("[MATH] Calculation done.");
-    }
-    Threads::yield(); // Yield after completing calculation
+    Serial.println("[MATH] Calculation done.");
 }
 
 // Task: Fast math task (runs every loop)
@@ -58,7 +49,6 @@ void fastTask()
 // Task: Serial debug print every 300 ms
 void debugTask()
 {
-    Threads::Scope scope(Serial_lock);
     Serial.print("[DEBUG] Total tasks: ");
     Serial.print(scheduler.getTaskCount());
     Serial.print(" | Math task is ");
@@ -68,22 +58,22 @@ void debugTask()
 void setup()
 {
     Serial.begin(115200);
-    pinMode(LED_BUILTIN, OUTPUT);
+    pinMode(ledPin, OUTPUT);
     delay(1000);
 
     Serial.println(">>> Scheduler Demo Starting <<<");
 
-    // Reorder tasks and be selective about threading
-    scheduler.addTask(blinkTask, 500); // LED can be safely threaded
-    scheduler.addTask(mathTask, 100, true); // Keep math in main thread initially
-    scheduler.addTask(fastTask, 0); // Keep fast task in main
-    scheduler.addTask(debugTask, 300, true); // Debug can be threaded
+    // Add tasks
+    scheduler.addTask(mathTask, 100); // Task 0
+    scheduler.addTask(fastTask, 0); // Task 1
+    scheduler.addTask(debugTask, 300, true); // Task 2
+    scheduler.addTask(blinkTask, 500); // Task 3 (in its own thread)
 
-    // Update indices to match new order
-    blinkTaskIndex = 0;
-    mathTaskIndex = 1;
-    fastTaskIndex = 2;
-    debugTaskIndex = 3;
+    // Save indices for control (for demonstration, not necessary)
+    mathTaskIndex = 0;
+    fastTaskIndex = 1;
+    debugTaskIndex = 2;
+    blinkTaskIndex = 3;
 
     Serial.println("[INIT] Tasks added.");
     Serial.print("[INIT] Total tasks registered: ");
@@ -94,22 +84,12 @@ void setup()
 
 void loop()
 {
-    static unsigned long lastDebug = 0;
     auto now = millis();
-
     scheduler.update();
 
-    // Debug print every second to verify loop is running
-    if (now - lastDebug >= 1000) {
-        lastDebug = now;
-        Threads::Scope scope(Serial_lock);
-        Serial.println("Main loop running...");
-    }
-
-    // Your existing toggle logic
+    // Toggle math task every 5 seconds to show enable/disable
     if (now - lastControlToggle >= 5000) {
         lastControlToggle = now;
-        Threads::Scope scope(Serial_lock); // Add mutex protection
 
         if (mathTaskEnabled) {
             scheduler.disableTask(mathTaskIndex);
