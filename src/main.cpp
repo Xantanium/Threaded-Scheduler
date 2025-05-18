@@ -1,0 +1,104 @@
+#include <../lib/Scheduler/Scheduler.h>
+#include <Arduino.h>
+#include <TeensyThreads.h>
+
+const int ledPin = 13;
+Scheduler scheduler;
+
+// Placeholders for indexing demonstration
+int blinkTaskIndex = -1;
+int mathTaskIndex = -1;
+int debugTaskIndex = -1;
+int fastTaskIndex = -1;
+
+unsigned long lastControlToggle = 0;
+bool mathTaskEnabled = true;
+
+// Task: LED Blink Task (runs in separate thread)
+void blinkTask()
+{
+    static bool ledState = false;
+    digitalWrite(ledPin, ledState);
+    ledState = !ledState;
+    Serial.println("[LED] Toggled.");
+}
+
+// Task: Math task every 100 ms
+void mathTask()
+{
+    // volatile is not strictly required here, but incase this task is offloaded to a thread, it will be necessary.
+    // use volatile when a variable might be changed unexpectedly, like within an interrupt or thread.
+    static volatile float result = 0.0f;
+    for (int i = 1; i < 500; ++i) {
+        result += sqrtf(i);
+    }
+    Serial.println("[MATH] Calculation done.");
+}
+
+// Task: Fast math task (runs every loop)
+void fastTask()
+{
+
+    // Not using volatile here since this task runs every loop, and dummy is not used anywhere else.
+    // Okay for compiler to optimize it.
+    static float dummy = 0.0;
+    dummy += 1.1;
+    // Not printing every loop to avoid spamming
+}
+
+// Task: Serial debug print every 300 ms
+void debugTask()
+{
+    Serial.print("[DEBUG] Total tasks: ");
+    Serial.print(scheduler.getTaskCount());
+    Serial.print(" | Math task is ");
+    Serial.println(mathTaskEnabled ? "ENABLED" : "DISABLED");
+}
+
+void setup()
+{
+    Serial.begin(115200);
+    pinMode(ledPin, OUTPUT);
+    delay(1000);
+
+    Serial.println(">>> Scheduler Demo Starting <<<");
+
+    // Add tasks
+    scheduler.addTask(mathTask, 100); // Task 0
+    scheduler.addTask(fastTask, 0); // Task 1
+    scheduler.addTask(debugTask, 300); // Task 2
+    scheduler.addTask(blinkTask, 500, true); // Task 3 (in its own thread)
+
+    // Save indices for control (for demonstration, not necessary)
+    mathTaskIndex = 0;
+    fastTaskIndex = 1;
+    debugTaskIndex = 2;
+    blinkTaskIndex = 3;
+
+    Serial.println("[INIT] Tasks added.");
+    Serial.print("[INIT] Total tasks registered: ");
+    Serial.println(scheduler.getTaskCount());
+
+    Serial.println("[INFO] Math task will toggle on/off every 5 seconds.");
+}
+
+void loop()
+{
+    auto now = millis();
+    scheduler.update();
+
+    // Toggle math task every 5 seconds to show enable/disable
+    if (now - lastControlToggle >= 5000) {
+        lastControlToggle = now;
+
+        if (mathTaskEnabled) {
+            scheduler.disableTask(mathTaskIndex);
+            Serial.println("[CONTROL] Math task DISABLED.");
+        } else {
+            scheduler.enableTask(mathTaskIndex);
+            Serial.println("[CONTROL] Math task ENABLED.");
+        }
+
+        mathTaskEnabled = !mathTaskEnabled;
+    }
+}
